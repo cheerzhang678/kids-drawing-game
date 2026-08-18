@@ -1,0 +1,1133 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>小小画家</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body { overflow: hidden; background: #f0f7ff; font-family: -apple-system, "PingFang SC", sans-serif; touch-action: none; }
+
+  #app { display: flex; flex-direction: column; height: 100vh; }
+
+  /* ---- 顶栏 ---- */
+  header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 16px; background: linear-gradient(135deg, #6ec6ff, #4da6ff);
+    color: #fff; flex-shrink: 0; min-height: 48px;
+    box-shadow: 0 2px 8px rgba(0,0,0,.15);
+  }
+  header h1 { font-size: 22px; font-weight: 700; letter-spacing: 2px; }
+  .header-btn {
+    background: rgba(255,255,255,.3); border: none; color: #fff;
+    font-size: 16px; padding: 6px 14px; border-radius: 20px; cursor: pointer;
+    transition: background .2s;
+  }
+  .header-btn:active { background: rgba(255,255,255,.5); }
+
+  /* ---- 画布区 ---- */
+  #canvas-wrap {
+    flex: 1; position: relative; overflow: hidden;
+    background: #e8e8e8;
+    display: flex; align-items: center; justify-content: center;
+  }
+  #canvas-stack {
+    position: relative;
+    box-shadow: 0 2px 8px rgba(0,0,0,.12);
+    width: 100%; height: 100%;
+  }
+  #paper-canvas, #draw-canvas {
+    position: absolute; top: 0; left: 0;
+    width: 100%; height: 100%;
+    display: block;
+  }
+  #paper-canvas { z-index: 0; }
+  #draw-canvas { z-index: 1; touch-action: none; background: transparent; }
+
+  /* ---- 工具栏 ---- */
+  #toolbar {
+    flex-shrink: 0; background: #fff;
+    border-top: 2px solid #e8f0fe; padding: 6px 8px 10px;
+    display: flex; flex-direction: column; gap: 8px;
+  }
+
+  /* 模式切换 */
+  .mode-row { display: flex; gap: 8px; justify-content: center; }
+  .mode-btn {
+    flex: 1; max-width: 140px; padding: 10px 0; border-radius: 14px;
+    border: 3px solid transparent; font-size: 18px; font-weight: 600;
+    cursor: pointer; transition: all .2s; display: flex; align-items: center;
+    justify-content: center; gap: 6px;
+  }
+  .mode-btn.active { border-color: #4da6ff; box-shadow: 0 0 0 2px rgba(77,166,255,.3); }
+  #btn-draw { background: #e3f2fd; color: #1565c0; }
+  #btn-draw.active { background: #bbdefb; }
+  #btn-stamp { background: #f3e5f5; color: #7b1fa2; }
+  #btn-stamp.active { background: #e1bee7; }
+  #btn-eraser { background: #fff3e0; color: #e65100; }
+  #btn-eraser.active { background: #ffe0b2; }
+  #btn-paper { background: #e0f2f1; color: #00695c; }
+  #btn-paper.active { background: #b2dfdb; }
+
+  /* 颜色选择 */
+  .color-row {
+    display: flex; gap: 6px; justify-content: center; flex-wrap: wrap;
+    padding: 2px 0;
+  }
+  .color-dot {
+    width: 38px; height: 38px; border-radius: 50%; border: 3px solid #fff;
+    cursor: pointer; transition: transform .15s, border-color .15s;
+    box-shadow: 0 2px 6px rgba(0,0,0,.15);
+  }
+  .color-dot:active { transform: scale(.9); }
+  .color-dot.active { border-color: #333; transform: scale(1.15); box-shadow: 0 0 0 2px rgba(0,0,0,.2); }
+
+  /* 画笔粗细 */
+  .size-row { display: flex; gap: 10px; align-items: center; justify-content: center; }
+  .size-btn {
+    border-radius: 50%; background: #90a4ae; cursor: pointer; border: 3px solid #fff;
+    box-shadow: 0 2px 6px rgba(0,0,0,.15); transition: transform .15s, border-color .15s;
+  }
+  .size-btn.active { border-color: #333; transform: scale(1.2); }
+  .size-btn[data-s="6"]  { width: 26px; height: 26px; }
+  .size-btn[data-s="14"] { width: 34px; height: 34px; }
+  .size-btn[data-s="26"] { width: 44px; height: 44px; }
+
+  /* 贴纸面板 */
+  #stamp-panel {
+    display: none; flex-wrap: wrap; gap: 4px; justify-content: center;
+    padding: 4px 0; max-height: 120px; overflow-y: auto;
+  }
+  #stamp-panel.show { display: flex; }
+  .stamp-btn {
+    width: 52px; height: 52px; font-size: 32px; border: none; border-radius: 12px;
+    background: #f5f5f5; cursor: pointer; transition: transform .15s, background .15s;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .stamp-btn:active { transform: scale(.85); background: #e0e0e0; }
+  .stamp-btn.active { background: #c8e6c9; transform: scale(1.1); }
+
+  /* 画纸面板 */
+  #paper-panel {
+    display: none; flex-wrap: wrap; gap: 8px; justify-content: center;
+    padding: 4px 0; max-height: 140px; overflow-y: auto;
+  }
+  #paper-panel.show { display: flex; }
+  .paper-btn {
+    width: 60px; height: 44px; border-radius: 10px; cursor: pointer;
+    border: 3px solid #fff; box-shadow: 0 2px 6px rgba(0,0,0,.15);
+    transition: transform .15s, border-color .15s;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px; overflow: hidden;
+  }
+  .paper-btn:active { transform: scale(.9); }
+  .paper-btn.active { border-color: #333; transform: scale(1.08); }
+  .paper-more {
+    width: 60px; height: 44px; border-radius: 10px; cursor: pointer;
+    border: 3px dashed #90caf9; background: #f0f7ff; color: #1565c0;
+    font-size: 12px; font-weight: 700; letter-spacing: 1px;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 2px 6px rgba(0,0,0,.1); transition: transform .15s, background .15s;
+  }
+  .paper-more:active { transform: scale(.9); }
+  .paper-more.expanded { background: #e3f2fd; border-style: solid; }
+
+  /* ---- 弹出提示 ---- */
+  .toast {
+    position: fixed; top: 60px; left: 50%; transform: translateX(-50%);
+    background: rgba(0,0,0,.7); color: #fff; padding: 8px 20px;
+    border-radius: 20px; font-size: 16px; z-index: 99;
+    opacity: 0; pointer-events: none; transition: opacity .3s;
+  }
+  .toast.show { opacity: 1; }
+
+  /* 快照面板 */
+  #snapshot-overlay {
+    display: none; position: fixed; inset: 0; z-index: 100;
+    background: rgba(0,0,0,.45); justify-content: center; align-items: center;
+  }
+  #snapshot-overlay.show { display: flex; }
+  #snapshot-panel {
+    background: #fff; border-radius: 16px; padding: 20px;
+    width: 90%; max-width: 520px; max-height: 80vh; overflow-y: auto;
+    box-shadow: 0 8px 32px rgba(0,0,0,.25);
+  }
+  #snapshot-panel h2 { font-size: 20px; margin-bottom: 12px; text-align: center; }
+  .snapshot-item {
+    display: flex; align-items: center; gap: 12px; padding: 10px;
+    border-radius: 10px; cursor: pointer; transition: background .15s;
+  }
+  .snapshot-item:hover { background: #f0f7ff; }
+  .snapshot-item img {
+    width: 80px; height: 56px; object-fit: cover; border-radius: 6px;
+    border: 1px solid #e0e0e0; background: #fff;
+  }
+  .snapshot-meta { flex: 1; }
+  .snapshot-time { font-size: 14px; color: #333; font-weight: 600; }
+  .snapshot-label { font-size: 12px; color: #999; margin-top: 2px; }
+  .snapshot-actions { display: flex; gap: 6px; }
+  .snapshot-actions button {
+    border: none; border-radius: 8px; padding: 5px 10px; font-size: 13px;
+    cursor: pointer; transition: background .15s;
+  }
+  .snap-restore { background: #e3f2fd; color: #1565c0; }
+  .snap-restore:hover { background: #bbdefb; }
+  .snap-delete { background: #fce4ec; color: #c62828; }
+  .snap-delete:hover { background: #f8bbd0; }
+  .snapshot-empty { text-align: center; color: #999; padding: 24px 0; font-size: 15px; }
+  .auto-save-indicator {
+    position: fixed; bottom: 16px; right: 16px; background: rgba(0,0,0,.6);
+    color: #fff; padding: 4px 12px; border-radius: 12px; font-size: 12px;
+    z-index: 50; opacity: 0; transition: opacity .3s;
+  }
+  .auto-save-indicator.show { opacity: 1; }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <button class="header-btn" id="btn-undo">↩ 撤销</button>
+    <h1>🎨 小小画家</h1>
+    <div style="display:flex;gap:6px;">
+      <button class="header-btn" id="btn-snapshots">📷 快照</button>
+      <button class="header-btn" id="btn-save">💾 保存</button>
+      <button class="header-btn" id="btn-download">📥 下载</button>
+      <button class="header-btn" id="btn-clear">🗑 清空</button>
+    </div>
+  </header>
+
+  <div id="canvas-wrap">
+    <div id="canvas-stack">
+      <canvas id="paper-canvas"></canvas>
+      <canvas id="draw-canvas"></canvas>
+    </div>
+  </div>
+
+  <div id="toolbar">
+    <!-- 模式 -->
+    <div class="mode-row">
+      <button class="mode-btn active" id="btn-draw" data-mode="draw">✏️ 画笔</button>
+      <button class="mode-btn" id="btn-stamp" data-mode="stamp">🐾 贴纸</button>
+      <button class="mode-btn" id="btn-eraser" data-mode="eraser">🧽 橡皮</button>
+      <button class="mode-btn" id="btn-paper" data-mode="paper">🖼 画纸</button>
+    </div>
+
+    <!-- 颜色 -->
+    <div class="color-row" id="color-row"></div>
+
+    <!-- 画笔粗细 -->
+    <div class="size-row" id="size-row">
+      <div class="size-btn" data-s="6"></div>
+      <div class="size-btn active" data-s="14"></div>
+      <div class="size-btn" data-s="26"></div>
+    </div>
+
+    <!-- 贴纸面板 -->
+    <div id="stamp-panel"></div>
+
+    <!-- 画纸面板 -->
+    <div id="paper-panel"></div>
+  </div>
+
+  <!-- 快照弹窗 -->
+  <div id="snapshot-overlay">
+    <div id="snapshot-panel">
+      <h2>📷 快照列表</h2>
+      <div id="snapshot-list"></div>
+    </div>
+  </div>
+  <div class="auto-save-indicator" id="auto-save-indicator">已自动保存</div>
+  <div class="toast" id="toast"></div>
+</div>
+
+<script>
+// ============ 数据 ============
+const COLORS = [
+  { hex: '#e53935', name: '红' },
+  { hex: '#ff9800', name: '橙' },
+  { hex: '#fdd835', name: '黄' },
+  { hex: '#43a047', name: '绿' },
+  { hex: '#26a69a', name: '湖绿' },
+  { hex: '#1b5e20', name: '深绿' },
+  { hex: '#039be5', name: '蓝' },
+  { hex: '#5e35b1', name: '紫' },
+  { hex: '#f48fb1', name: '粉' },
+  { hex: '#6d4c41', name: '棕' },
+  { hex: '#212121', name: '黑' },
+  { hex: '#ffffff', name: '白' },
+  { hex: '#bdbdbd', name: '浅灰' },
+  { hex: '#3949ab', name: '靛' },
+];
+
+const ANIMALS = ['🐱','🐶','🐰','🐻','🐼','🐨','🦊','🐯','🦁','🐮','🐷','🐸','🐵','🐔','🐧','🦋'];
+const PLANTS  = ['🌸','🌺','🌻','🌹','🌷','🌼','🌵','🍀','🌿','🍁','🌳','🌴','🍎','🍉','🍓','🍒','🍅','🍑'];
+
+// 画纸（背景）。css 用于工具栏预览和快照缩略图底色
+const PAPERS = [
+  { id: 'white',      name: '白纸', type: 'solid',    color: '#ffffff', css: '#ffffff' },
+  { id: 'cream',      name: '米色', type: 'solid',    color: '#fff8e7', css: '#fff8e7' },
+  { id: 'pink',       name: '粉纸', type: 'solid',    color: '#fce4ec', css: '#fce4ec' },
+  { id: 'blackboard', name: '黑板', type: 'solid',    color: '#2e5040', css: '#2e5040' },
+  { id: 'grid',       name: '方格', type: 'pattern',  kind: 'grid',
+    css: 'repeating-linear-gradient(#cfe3f5 0 1px, #fff 1px 8px), repeating-linear-gradient(90deg, #cfe3f5 0 1px, #fff 1px 8px)' },
+  { id: 'dots',       name: '圆点', type: 'pattern',  kind: 'dots',
+    css: 'radial-gradient(#d8d2c4 1.2px, #fffdf7 1.2px) 0 0 / 8px 8px' },
+  { id: 'lines',      name: '横线', type: 'pattern',  kind: 'lines',
+    css: 'repeating-linear-gradient(#dbe8f5 0 1px, #fff 1px 9px)' },
+  { id: 'sky',        name: '天空', type: 'gradient', from: '#e3f2fd', to: '#42a5f5',
+    css: 'linear-gradient(#e3f2fd, #42a5f5)' },
+  { id: 'grass',      name: '草地', type: 'gradient', from: '#c8e6c9', to: '#81c784',
+    css: 'linear-gradient(#c8e6c9, #81c784)' },
+  { id: 'sunset',     name: '晚霞', type: 'gradient', from: '#ffcc80', to: '#ff8a65',
+    css: 'linear-gradient(#ffcc80, #ff8a65)' },
+  { id: 'daisyfield', name: '黄花', type: 'gradient', from: '#fffde7', to: '#f9a825',
+    css: 'linear-gradient(#fffde7, #f9a825)' },
+  { id: 'pinkgrad',   name: '香水', type: 'gradient', from: '#fce4ec', to: '#f06292',
+    css: 'linear-gradient(#fce4ec, #f06292)' },
+  { id: 'stone',      name: '石头', type: 'gradient', from: '#eceff1', to: '#607d8b',
+    css: 'linear-gradient(#eceff1, #607d8b)' },
+  { id: 'blueberry',  name: '蓝莓', type: 'gradient', from: '#ede7f6', to: '#5e35b1',
+    css: 'linear-gradient(#ede7f6, #5e35b1)' },
+  { id: 'chair',      name: '椅子', type: 'gradient', from: '#f5d5b3', to: '#6d4c41',
+    css: 'linear-gradient(#f5d5b3, #6d4c41)' },
+  { id: 'brick',      name: '红砖', type: 'gradient', from: '#ffcdd2', to: '#8d3a2e',
+    css: 'linear-gradient(#ffcdd2, #8d3a2e)' },
+  { id: 'zebra',      name: '斑马', type: 'gradient', from: '#ffffff', to: '#212121',
+    css: 'linear-gradient(#ffffff, #212121)' },
+  { id: 'blueice',    name: '雪冰', type: 'gradient', from: '#e8eaf6', to: '#1a237e',
+    css: 'linear-gradient(#e8eaf6, #1a237e)' },
+  { id: 'wheat',      name: '小麦', type: 'gradient', from: '#fff8e1', to: '#c9a66b',
+    css: 'linear-gradient(#fff8e1, #c9a66b)' },
+  { id: 'midnight',   name: '深夜', type: 'gradient', from: '#1b5e20', to: '#0b2410',
+    css: 'linear-gradient(#1b5e20, #0b2410)' },
+  { id: 'sea',        name: '大海', type: 'pattern',  kind: 'sea',
+    css: 'repeating-linear-gradient(rgba(255,255,255,.5) 0 1.5px, transparent 1.5px 7px), linear-gradient(#4fc3f7, #0277bd)' },
+  { id: 'arches',     name: '拱门', type: 'pattern', kind: 'arches',
+    css: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 60 44\'%3E%3Crect width=\'60\' height=\'44\' fill=\'%23d32f2f\'/%3E%3Cpath d=\'M18 34 V20 a7 7 0 0 1 14 0 V34\' fill=\'none\' stroke=\'%23ffc107\' stroke-width=\'5\'/%3E%3Cpath d=\'M29 34 V20 a7 7 0 0 1 14 0 V34\' fill=\'none\' stroke=\'%23ffc107\' stroke-width=\'5\'/%3E%3C/svg%3E") center / cover' },
+  { id: 'attic',      name: '阁楼', type: 'pattern', kind: 'attic',
+    css: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 60 44\'%3E%3Crect width=\'60\' height=\'44\' fill=\'%239e9e9e\'/%3E%3Crect x=\'23\' y=\'12\' width=\'14\' height=\'20\' rx=\'2\' fill=\'%23bcd4e6\' stroke=\'%23616161\' stroke-width=\'2\'/%3E%3Cpath d=\'M30 12 V32 M23 22 H37\' stroke=\'%23616161\' stroke-width=\'2\'/%3E%3C/svg%3E") center / cover' },
+  { id: 'treerings',  name: '树木', type: 'pattern', kind: 'treerings',
+    css: 'radial-gradient(circle at center, #6d4c41 0 6%, #a1887f 6% 7%, #6d4c41 7% 14%, #a1887f 14% 15%, #6d4c41 15% 24%, #a1887f 24% 25%, #6d4c41 25% 38%, #a1887f 38% 39%, #6d4c41 39% 55%, #a1887f 55% 56%, #6d4c41 56% 100%)' },
+  { id: 'poland',     name: '波兰', type: 'pattern', kind: 'poland',
+    css: 'linear-gradient(#ffffff 0 50%, #dc143c 50% 100%)' },
+  { id: 'moon',       name: '月夜', type: 'pattern', kind: 'moon',
+    css: 'radial-gradient(#fff 0.6px, transparent 0.7px) 0 0 / 9px 9px, radial-gradient(circle at 72% 32%, #fff59d 0 6px, transparent 7px), linear-gradient(#1a237e, #0d1333)' },
+  { id: 'bucket',     name: '小桶', type: 'pattern', kind: 'bucket',
+    css: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 60 44\'%3E%3Crect width=\'60\' height=\'44\' fill=\'%23fff8e7\'/%3E%3Cpath d=\'M22 14 h16 l-4 20 h-8 z\' fill=\'%23ff9800\'/%3E%3Cpath d=\'M22 14 a8 8 0 0 1 16 0\' fill=\'none\' stroke=\'%23ff9800\' stroke-width=\'3\'/%3E%3C/svg%3E") center / cover' },
+  { id: 'starry',     name: '星空', type: 'pattern',  kind: 'stars',
+    css: 'radial-gradient(#fff 0.6px, transparent 0.7px) 0 0 / 9px 9px, linear-gradient(#0d1b3e, #2a1a4a)' },
+];
+
+// ============ 状态 ============
+let mode = 'draw';          // draw | stamp | eraser | paper
+let lastDrawMode = 'draw';  // 从画纸面板返回时用
+let currentColor = COLORS[0].hex;
+let brushSize = 14;
+let currentStamp = ANIMALS[0];
+let currentPaper = PAPERS[0];
+let drawing = false;
+let lastX = 0, lastY = 0;
+let history = [];            // 撤销栈（ImageData）
+const MAX_HISTORY = 30;
+
+// ============ Canvas 初始化 ============
+const canvas = document.getElementById('draw-canvas');
+const ctx = canvas.getContext('2d', { willReadFrequently: true });
+const paperCanvas = document.getElementById('paper-canvas');
+const paperCtx = paperCanvas.getContext('2d');
+// 逻辑尺寸（CSS像素），初始化后固定不变
+let logicW = 0, logicH = 0;
+
+function initCanvas() {
+  const wrap = document.getElementById('canvas-wrap');
+  logicW = wrap.clientWidth;
+  logicH = wrap.clientHeight;
+  // 设置 canvas 像素尺寸，之后不再改变
+  canvas.width = paperCanvas.width = logicW * devicePixelRatio;
+  canvas.height = paperCanvas.height = logicH * devicePixelRatio;
+  fitCanvasCSS();
+  ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+  paperCtx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+  // 绘制层保持透明，画纸在下层
+  ctx.clearRect(0, 0, logicW, logicH);
+  drawPaper();
+  saveHistory();
+}
+
+// 容器尺寸变化时，只调整 CSS 显示尺寸，不改变 canvas 像素
+function fitCanvasCSS() {
+  const wrap = document.getElementById('canvas-wrap');
+  const stack = document.getElementById('canvas-stack');
+  const cw = wrap.clientWidth;
+  const ch = wrap.clientHeight;
+  if (cw === 0 || ch === 0 || logicW === 0) return;
+  // 等比例缩放，取较小比
+  const scale = Math.min(cw / logicW, ch / logicH);
+  stack.style.width = (logicW * scale) + 'px';
+  stack.style.height = (logicH * scale) + 'px';
+}
+
+// ============ 画纸 ============
+function drawPaper(p = currentPaper) {
+  const g = paperCtx;
+  g.save();
+  g.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+  g.clearRect(0, 0, logicW, logicH);
+
+  if (p.type === 'solid') {
+    g.fillStyle = p.color;
+    g.fillRect(0, 0, logicW, logicH);
+  } else if (p.type === 'gradient') {
+    const grad = g.createLinearGradient(0, 0, 0, logicH);
+    grad.addColorStop(0, p.from);
+    grad.addColorStop(1, p.to);
+    g.fillStyle = grad;
+    g.fillRect(0, 0, logicW, logicH);
+  } else if (p.type === 'pattern') {
+    drawPaperPattern(g, p.kind);
+  }
+  g.restore();
+}
+
+function drawPaperPattern(g, kind) {
+  if (kind === 'grid') {
+    g.fillStyle = '#ffffff';
+    g.fillRect(0, 0, logicW, logicH);
+    g.strokeStyle = '#cfe3f5';
+    g.lineWidth = 1;
+    const step = 32;
+    g.beginPath();
+    for (let x = step; x < logicW; x += step) { g.moveTo(x, 0); g.lineTo(x, logicH); }
+    for (let y = step; y < logicH; y += step) { g.moveTo(0, y); g.lineTo(logicW, y); }
+    g.stroke();
+  } else if (kind === 'dots') {
+    g.fillStyle = '#fffdf7';
+    g.fillRect(0, 0, logicW, logicH);
+    g.fillStyle = '#d8d2c4';
+    const step = 28;
+    for (let y = step; y < logicH; y += step) {
+      for (let x = step; x < logicW; x += step) {
+        g.beginPath();
+        g.arc(x, y, 2, 0, Math.PI * 2);
+        g.fill();
+      }
+    }
+  } else if (kind === 'lines') {
+    g.fillStyle = '#ffffff';
+    g.fillRect(0, 0, logicW, logicH);
+    g.strokeStyle = '#dbe8f5';
+    g.lineWidth = 1;
+    const step = 40;
+    g.beginPath();
+    for (let y = step; y < logicH; y += step) { g.moveTo(0, y); g.lineTo(logicW, y); }
+    g.stroke();
+    // 左侧红色边线
+    g.strokeStyle = '#f2b8b5';
+    g.beginPath();
+    g.moveTo(48, 0); g.lineTo(48, logicH);
+    g.stroke();
+  } else if (kind === 'stars') {
+    const grad = g.createLinearGradient(0, 0, 0, logicH);
+    grad.addColorStop(0, '#0d1b3e');
+    grad.addColorStop(1, '#2a1a4a');
+    g.fillStyle = grad;
+    g.fillRect(0, 0, logicW, logicH);
+    // 固定分布的星点（伪随机，保证每次一致）
+    let seed = 7;
+    const rand = () => (seed = (seed * 9301 + 49297) % 233280) / 233280;
+    const count = Math.floor(logicW * logicH / 2600);
+    for (let i = 0; i < count; i++) {
+      const x = rand() * logicW;
+      const y = rand() * logicH;
+      const r = rand() * 1.4 + 0.4;
+      g.fillStyle = `rgba(255,255,255,${0.35 + rand() * 0.6})`;
+      g.beginPath();
+      g.arc(x, y, r, 0, Math.PI * 2);
+      g.fill();
+    }
+  } else if (kind === 'sea') {
+    // 蓝色渐变海面
+    const grad = g.createLinearGradient(0, 0, 0, logicH);
+    grad.addColorStop(0, '#4fc3f7');
+    grad.addColorStop(1, '#0277bd');
+    g.fillStyle = grad;
+    g.fillRect(0, 0, logicW, logicH);
+    // 若干条白色波浪线，越往下越淡、越密，模拟深度感
+    let seed = 3;
+    const rand = () => (seed = (seed * 9301 + 49297) % 233280) / 233280;
+    const rows = Math.max(6, Math.round(logicH / 46));
+    for (let r = 0; r < rows; r++) {
+      const y = (r + 0.5) * (logicH / rows);
+      const amp = 6 + rand() * 4;
+      const waveLen = 60 + rand() * 40;
+      const phase = rand() * Math.PI * 2;
+      g.beginPath();
+      for (let x = 0; x <= logicW; x += 4) {
+        const wy = y + Math.sin(x / waveLen + phase) * amp;
+        if (x === 0) g.moveTo(x, wy); else g.lineTo(x, wy);
+      }
+      g.strokeStyle = `rgba(255,255,255,${0.35 + (r / rows) * 0.25})`;
+      g.lineWidth = 2;
+      g.stroke();
+    }
+  } else if (kind === 'arches') {
+    // 红底 + 两个并排的黄色拱门
+    g.fillStyle = '#d32f2f';
+    g.fillRect(0, 0, logicW, logicH);
+
+    const unit = Math.min(logicW / 3.2, logicH / 2.2);
+    const rad = unit / 2;                   // 拱顶半径
+    const lw = Math.max(8, unit * 0.22);    // 拱柱粗细
+    const gap = rad * 0.18;                 // 两拱之间的缝隙
+    const legH = unit * 0.8;                // 拱柱直段长度
+    const cy = logicH / 2 - legH / 4;       // 拱顶圆心
+    const footY = cy + legH;                // 柱脚
+    const cx1 = logicW / 2 - rad - gap / 2;
+    const cx2 = logicW / 2 + rad + gap / 2;
+
+    g.strokeStyle = '#ffc107';
+    g.lineWidth = lw;
+    g.lineCap = 'round';
+    g.lineJoin = 'round';
+    [cx1, cx2].forEach(cx => {
+      g.beginPath();
+      g.moveTo(cx - rad, footY);
+      g.lineTo(cx - rad, cy);
+      g.arc(cx, cy, rad, Math.PI, 0);       // 半圆拱顶
+      g.lineTo(cx + rad, footY);
+      g.stroke();
+    });
+  } else if (kind === 'attic') {
+    drawAttic(g);
+  } else if (kind === 'treerings') {
+    drawTreeRings(g);
+  } else if (kind === 'poland') {
+    // 波兰国旗：上白下红
+    g.fillStyle = '#ffffff';
+    g.fillRect(0, 0, logicW, logicH / 2);
+    g.fillStyle = '#dc143c';
+    g.fillRect(0, logicH / 2, logicW, logicH / 2);
+  } else if (kind === 'moon') {
+    drawMoonNight(g);
+  } else if (kind === 'bucket') {
+    drawBucket(g);
+  }
+}
+
+// 小桶：米色底 + 橙色圆锥桶身 + 上方橙色倒U提手
+function drawBucket(g) {
+  g.fillStyle = '#fff8e7';
+  g.fillRect(0, 0, logicW, logicH);
+
+  const unit = Math.min(logicW * 0.34, logicH * 0.4);
+  const cx = logicW / 2;
+  const topW = unit;            // 桶口宽度
+  const botW = unit * 0.55;     // 桶底宽度（上宽下窄，圆锥形）
+  const bodyH = unit * 1.15;
+  const topY = logicH / 2 - bodyH * 0.18;
+  const botY = topY + bodyH;
+
+  // 桶身：上宽下窄的梯形
+  g.fillStyle = '#ff9800';
+  g.beginPath();
+  g.moveTo(cx - topW / 2, topY);
+  g.lineTo(cx + topW / 2, topY);
+  g.lineTo(cx + botW / 2, botY);
+  g.lineTo(cx - botW / 2, botY);
+  g.closePath();
+  g.fill();
+
+  // 提手：倒 U 形（半圆开口朝下）
+  g.strokeStyle = '#ff9800';
+  g.lineWidth = Math.max(5, unit * 0.09);
+  g.lineCap = 'round';
+  g.beginPath();
+  g.arc(cx, topY, topW / 2, Math.PI, 0);
+  g.stroke();
+}
+
+// 年轮：棕色底 + 一圈圈由小到大的浅棕色同心圆
+function drawTreeRings(g) {
+  g.fillStyle = '#6d4c41';
+  g.fillRect(0, 0, logicW, logicH);
+
+  const cx = logicW / 2;
+  const cy = logicH / 2;
+  // 最大圈刚好贴住画布短边
+  const maxR = Math.min(logicW, logicH) * 0.46;
+  const rings = 9;
+
+  g.lineCap = 'round';
+  for (let i = rings; i >= 1; i--) {
+    // 半径按平方根分布，外圈间距略窄，更像真实年轮
+    const r = maxR * Math.sqrt(i / rings);
+    g.beginPath();
+    g.arc(cx, cy, r, 0, Math.PI * 2);
+    // 越靠外的圈越浅一点
+    g.strokeStyle = `rgba(188,158,143,${0.55 + (i / rings) * 0.4})`;
+    g.lineWidth = Math.max(2, maxR * 0.018);
+    g.stroke();
+  }
+
+  // 圆心的髓心
+  g.beginPath();
+  g.arc(cx, cy, Math.max(3, maxR * 0.03), 0, Math.PI * 2);
+  g.fillStyle = '#a1887f';
+  g.fill();
+}
+
+// 阁楼：灰色墙面 + 一扇采光窗
+function drawAttic(g) {
+  // 墙面：上深下浅，模拟顶灯光照
+  const wall = g.createLinearGradient(0, 0, 0, logicH);
+  wall.addColorStop(0, '#8d8d8d');
+  wall.addColorStop(1, '#b5b5b5');
+  g.fillStyle = wall;
+  g.fillRect(0, 0, logicW, logicH);
+
+  // 窗户尺寸：占画布中上部
+  const w = Math.min(logicW * 0.42, logicH * 0.5);
+  const h = w * 1.35;
+  const x = (logicW - w) / 2;
+  const y = logicH * 0.16;
+  const frame = Math.max(6, w * 0.045);
+
+  // 窗外天光
+  const sky = g.createLinearGradient(0, y, 0, y + h);
+  sky.addColorStop(0, '#bfe3f7');
+  sky.addColorStop(1, '#eef7fb');
+  g.fillStyle = sky;
+  g.fillRect(x, y, w, h);
+
+  // 从窗户斜射进屋的光带
+  g.save();
+  g.beginPath();
+  g.moveTo(x, y + h);
+  g.lineTo(x + w, y + h);
+  g.lineTo(x + w * 1.5, logicH);
+  g.lineTo(x - w * 0.5, logicH);
+  g.closePath();
+  g.fillStyle = 'rgba(255,250,225,.22)';
+  g.fill();
+  g.restore();
+
+  // 窗框 + 十字窗棂
+  g.strokeStyle = '#5d5d5d';
+  g.lineCap = 'square';
+  g.lineWidth = frame;
+  g.strokeRect(x, y, w, h);
+  g.lineWidth = frame * 0.6;
+  g.beginPath();
+  g.moveTo(x + w / 2, y);
+  g.lineTo(x + w / 2, y + h);
+  g.moveTo(x, y + h / 2);
+  g.lineTo(x + w, y + h / 2);
+  g.stroke();
+
+  // 窗台
+  g.fillStyle = '#6f6f6f';
+  g.fillRect(x - frame * 1.6, y + h, w + frame * 3.2, frame * 1.1);
+}
+
+// 月夜：深蓝夜空 + 月牙 + 很多星星
+// 黄花草地：晚霞天空 + 绿色草地 + 点缀黄花
+function drawMoonNight(g) {
+  // 天地分界线：上 65% 夜空，下 35% 草地
+  const horizon = logicH * 0.65;
+
+  // 夜空
+  const sky = g.createLinearGradient(0, 0, 0, horizon);
+  sky.addColorStop(0, '#0d1333');
+  sky.addColorStop(1, '#1a237e');
+  g.fillStyle = sky;
+  g.fillRect(0, 0, logicW, horizon);
+
+  // 星星（只在夜空区域）
+  let seed = 42;
+  const rand = () => (seed = (seed * 9301 + 49297) % 233280) / 233280;
+  const count = Math.floor(logicW * horizon / 1200);
+  for (let i = 0; i < count; i++) {
+    const sx = rand() * logicW;
+    const sy = rand() * horizon;
+    const sr = rand() * 1.6 + 0.5;
+    g.fillStyle = `rgba(255,255,255,${0.3 + rand() * 0.7})`;
+    g.beginPath();
+    g.arc(sx, sy, sr, 0, Math.PI * 2);
+    g.fill();
+  }
+
+  // 月牙：在离屏 canvas 上用 destination-out 挖出缺口，
+  // 再贴到夜空上，这样缺口是真透明，不会露出与渐变不符的纯色块
+  const moonR = Math.min(logicW, logicH) * 0.13;
+  const moonX = logicW * 0.72;
+  const moonY = horizon * 0.35;
+  const pad = moonR * 2.6;
+
+  const m = document.createElement('canvas');
+  m.width = m.height = Math.ceil(pad * devicePixelRatio);
+  const mg = m.getContext('2d');
+  mg.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+  const c = pad / 2;
+  mg.fillStyle = '#fff9c4';
+  mg.beginPath();
+  mg.arc(c, c, moonR, 0, Math.PI * 2);
+  mg.fill();
+  mg.globalCompositeOperation = 'destination-out';
+  mg.beginPath();
+  mg.arc(c + moonR * 0.6, c - moonR * 0.18, moonR * 0.88, 0, Math.PI * 2);
+  mg.fill();
+
+  g.drawImage(m, moonX - c, moonY - c, pad, pad);
+
+  // 草地：亮绿色
+  const grass = g.createLinearGradient(0, horizon, 0, logicH);
+  grass.addColorStop(0, '#4caf50');
+  grass.addColorStop(1, '#2e7d32');
+  g.fillStyle = grass;
+  g.fillRect(0, horizon, logicW, logicH - horizon);
+
+  // 地平线上一层浅色高光，压出天地分界
+  g.fillStyle = 'rgba(255,255,255,.12)';
+  g.fillRect(0, horizon, logicW, 2);
+
+  // 草地上零星的草丛线条
+  g.strokeStyle = 'rgba(46,125,50,.6)';
+  g.lineWidth = 1.5;
+  g.lineCap = 'round';
+  const tufts = Math.floor(logicW / 12);
+  for (let i = 0; i < tufts; i++) {
+    const gx = rand() * logicW;
+    const gy = horizon + rand() * (logicH - horizon);
+    const gh = 3 + rand() * 5;
+    g.beginPath();
+    g.moveTo(gx, gy + gh);
+    g.lineTo(gx, gy);
+    g.stroke();
+  }
+}
+
+function setPaper(p) {
+  currentPaper = p;
+  drawPaper(p);
+  savePaperChoice();
+  showToast('画纸：' + p.name);
+}
+
+// 合成画纸 + 画作，用于保存/下载/快照
+function composeCanvas() {
+  const out = document.createElement('canvas');
+  out.width = canvas.width;
+  out.height = canvas.height;
+  const g = out.getContext('2d');
+  g.drawImage(paperCanvas, 0, 0);
+  g.drawImage(canvas, 0, 0);
+  return out;
+}
+
+// 用 ResizeObserver 监听容器变化（窗口缩放、工具栏展开等都会触发）
+const wrapEl = document.getElementById('canvas-wrap');
+new ResizeObserver(fitCanvasCSS).observe(wrapEl);
+
+// ============ 历史记录 ============
+function saveHistory() {
+  if (history.length >= MAX_HISTORY) history.shift();
+  history.push(ctx.getImageData(0, 0, canvas.width, canvas.height));
+}
+
+function undo() {
+  if (history.length <= 1) return;
+  history.pop();
+  ctx.putImageData(history[history.length - 1], 0, 0);
+  showToast('已撤销');
+}
+
+function clearAll() {
+  ctx.save();
+  ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+  ctx.clearRect(0, 0, logicW, logicH);
+  ctx.restore();
+  // 画纸重置回白纸
+  currentPaper = PAPERS[0];
+  drawPaper(currentPaper);
+  savePaperChoice();
+  buildPapers();
+  saveHistory();
+  showToast('画布已清空');
+}
+
+// ============ 保存 & 下载 ============
+// v2：绘制层改为透明（画纸在下层独立 canvas），旧的不透明存档会盖住画纸，故换 key 丢弃
+const STORAGE_KEY = 'kids_drawing_save_v2';
+const PAPER_KEY = 'kids_drawing_paper';
+
+function savePaperChoice() {
+  try { localStorage.setItem(PAPER_KEY, currentPaper.id); } catch {}
+}
+
+function loadPaperChoice() {
+  const id = localStorage.getItem(PAPER_KEY);
+  if (id) {
+    const p = PAPERS.find(x => x.id === id);
+    if (p) currentPaper = p;
+  }
+}
+
+function saveDrawing() {
+  try {
+    const data = canvas.toDataURL('image/png');
+    localStorage.setItem(STORAGE_KEY, data);
+    savePaperChoice();
+    showToast('画作已保存');
+  } catch (e) {
+    showToast('保存失败');
+  }
+}
+
+function loadDrawing() {
+  const data = localStorage.getItem(STORAGE_KEY);
+  if (!data) return false;
+  const img = new Image();
+  img.onload = () => {
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(img, 0, 0);
+    ctx.restore();
+    saveHistory();
+  };
+  img.src = data;
+  return true;
+}
+
+function downloadDrawing() {
+  const link = document.createElement('a');
+  link.download = '我的画作_' + new Date().toLocaleDateString('zh-CN').replace(/\//g, '-') + '.png';
+  link.href = composeCanvas().toDataURL('image/png');
+  link.click();
+  showToast('画作已下载');
+}
+
+// ============ 快照 ============
+const SNAP_KEY = 'kids_drawing_snapshots_v2';
+const MAX_SNAPSHOTS = 10;
+const AUTO_SAVE_INTERVAL = 30000; // 30秒
+let autoSaveTimer = null;
+
+function getSnapshots() {
+  try {
+    return JSON.parse(localStorage.getItem(SNAP_KEY)) || [];
+  } catch { return []; }
+}
+
+function saveSnapshots(snaps) {
+  try {
+    localStorage.setItem(SNAP_KEY, JSON.stringify(snaps));
+  } catch {
+    // 存储满了，删除最旧的
+    if (snaps.length > 1) {
+      snaps.shift();
+      saveSnapshots(snaps);
+    }
+  }
+}
+
+function takeSnapshot() {
+  const snaps = getSnapshots();
+  const now = new Date();
+  const data = composeCanvas().toDataURL('image/png');
+  snaps.push({
+    id: Date.now(),
+    time: now.toLocaleString('zh-CN'),
+    data: data
+  });
+  // 超出上限删除最旧的
+  while (snaps.length > MAX_SNAPSHOTS) snaps.shift();
+  saveSnapshots(snaps);
+}
+
+function autoSave() {
+  takeSnapshot();
+  const indicator = document.getElementById('auto-save-indicator');
+  indicator.classList.add('show');
+  setTimeout(() => indicator.classList.remove('show'), 1500);
+}
+
+function restoreSnapshot(id) {
+  const snaps = getSnapshots();
+  const snap = snaps.find(s => s.id === id);
+  if (!snap) return;
+  const img = new Image();
+  img.onload = () => {
+    // 快照是画纸+画作的合成图，恢复时整张放到绘制层，
+    // 并把画纸切回白纸，避免旧画纸重复叠加
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(img, 0, 0);
+    ctx.restore();
+    setPaper(PAPERS[0]);
+    document.querySelectorAll('.paper-btn').forEach(x => x.classList.toggle('active', x.dataset.id === 'white'));
+    saveHistory();
+  };
+  img.src = snap.data;
+}
+
+function deleteSnapshot(id) {
+  let snaps = getSnapshots();
+  snaps = snaps.filter(s => s.id !== id);
+  saveSnapshots(snaps);
+  renderSnapshotList();
+  showToast('已删除快照');
+}
+
+function renderSnapshotList() {
+  const list = document.getElementById('snapshot-list');
+  const snaps = getSnapshots();
+  if (snaps.length === 0) {
+    list.innerHTML = '<div class="snapshot-empty">暂无快照，系统会每30秒自动保存</div>';
+    return;
+  }
+  list.innerHTML = snaps.slice().reverse().map(s => `
+    <div class="snapshot-item">
+      <img src="${s.data}" alt="快照">
+      <div class="snapshot-meta">
+        <div class="snapshot-time">${s.time}</div>
+        <div class="snapshot-label">自动保存</div>
+      </div>
+      <div class="snapshot-actions">
+        <button class="snap-restore" onclick="restoreSnapshot(${s.id})">恢复</button>
+        <button class="snap-delete" onclick="deleteSnapshot(${s.id})">删除</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function openSnapshotPanel() {
+  renderSnapshotList();
+  document.getElementById('snapshot-overlay').classList.add('show');
+}
+
+function closeSnapshotPanel() {
+  document.getElementById('snapshot-overlay').classList.remove('show');
+}
+
+// ============ 绘制逻辑 ============
+function getPos(e) {
+  const rect = canvas.getBoundingClientRect();
+  const t = e.touches ? e.touches[0] : e;
+  // CSS显示坐标 → 逻辑坐标
+  return {
+    x: (t.clientX - rect.left) * logicW / rect.width,
+    y: (t.clientY - rect.top) * logicH / rect.height
+  };
+}
+
+function startDraw(e) {
+  e.preventDefault();
+  if (mode === 'stamp') { placeStamp(e); return; }
+  drawing = true;
+  const p = getPos(e);
+  lastX = p.x; lastY = p.y;
+  // 橡皮擦掉绘制层，露出下面的画纸
+  ctx.globalCompositeOperation = mode === 'eraser' ? 'destination-out' : 'source-over';
+  // 画一个点
+  ctx.beginPath();
+  ctx.arc(p.x, p.y, (mode === 'eraser' ? brushSize * 1.5 : brushSize) / 2, 0, Math.PI * 2);
+  ctx.fillStyle = mode === 'eraser' ? '#000' : currentColor;
+  ctx.fill();
+  ctx.globalCompositeOperation = 'source-over';
+}
+
+function moveDraw(e) {
+  e.preventDefault();
+  if (!drawing) return;
+  const p = getPos(e);
+  ctx.globalCompositeOperation = mode === 'eraser' ? 'destination-out' : 'source-over';
+  ctx.beginPath();
+  ctx.moveTo(lastX, lastY);
+  ctx.lineTo(p.x, p.y);
+  ctx.strokeStyle = mode === 'eraser' ? '#000' : currentColor;
+  ctx.lineWidth = mode === 'eraser' ? brushSize * 1.5 : brushSize;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.stroke();
+  ctx.globalCompositeOperation = 'source-over';
+  lastX = p.x; lastY = p.y;
+}
+
+function endDraw(e) {
+  if (!drawing) return;
+  drawing = false;
+  saveHistory();
+}
+
+// ============ 贴纸 ============
+function placeStamp(e) {
+  const p = getPos(e);
+  const size = 48;
+  ctx.font = `${size}px serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(currentStamp, p.x, p.y);
+  saveHistory();
+}
+
+// ============ UI 构建 ============
+function buildColors() {
+  const row = document.getElementById('color-row');
+  COLORS.forEach((c, i) => {
+    const d = document.createElement('div');
+    d.className = 'color-dot' + (i === 0 ? ' active' : '');
+    d.style.background = c.hex;
+    if (c.hex === '#ffffff') d.style.border = '3px solid #ccc';
+    d.addEventListener('click', () => {
+      document.querySelectorAll('.color-dot').forEach(x => x.classList.remove('active'));
+      d.classList.add('active');
+      currentColor = c.hex;
+      if (mode === 'eraser') switchMode('draw');
+    });
+    row.appendChild(d);
+  });
+}
+
+function buildStamps() {
+  const panel = document.getElementById('stamp-panel');
+  const all = [...ANIMALS, ...PLANTS];
+  all.forEach((s, i) => {
+    const b = document.createElement('button');
+    b.className = 'stamp-btn' + (i === 0 ? ' active' : '');
+    b.textContent = s;
+    b.addEventListener('click', () => {
+      document.querySelectorAll('.stamp-btn').forEach(x => x.classList.remove('active'));
+      b.classList.add('active');
+      currentStamp = s;
+    });
+    panel.appendChild(b);
+  });
+}
+
+// 默认只显示渐变类画纸，其余收进「更多」
+let papersExpanded = false;
+
+function buildPapers() {
+  const panel = document.getElementById('paper-panel');
+  panel.innerHTML = '';
+
+  PAPERS.forEach(p => {
+    const b = document.createElement('div');
+    b.className = 'paper-btn' + (p.id === currentPaper.id ? ' active' : '');
+    b.style.background = p.css;
+    b.title = p.name;
+    b.dataset.id = p.id;
+    b.dataset.type = p.type;
+    // 折叠时非渐变画纸隐藏；但当前选中的始终可见，否则看不出选了什么
+    const hidden = !papersExpanded && p.type !== 'gradient' && p.id !== currentPaper.id;
+    b.style.display = hidden ? 'none' : 'flex';
+    b.addEventListener('click', () => {
+      document.querySelectorAll('.paper-btn').forEach(x => x.classList.remove('active'));
+      b.classList.add('active');
+      setPaper(p);
+    });
+    panel.appendChild(b);
+  });
+
+  const more = document.createElement('div');
+  more.className = 'paper-more' + (papersExpanded ? ' expanded' : '');
+  more.id = 'paper-more';
+  more.textContent = papersExpanded ? '收起' : '更多…';
+  more.title = papersExpanded ? '只看渐变画纸' : '查看全部画纸';
+  more.addEventListener('click', () => {
+    papersExpanded = !papersExpanded;
+    buildPapers();
+  });
+  panel.appendChild(more);
+}
+
+function switchMode(m) {
+  mode = m;
+  lastDrawMode = m;
+  document.querySelectorAll('.mode-btn').forEach(b => b.classList.toggle('active', b.dataset.mode === m));
+  document.getElementById('stamp-panel').classList.toggle('show', m === 'stamp');
+  document.getElementById('paper-panel').classList.remove('show');
+  document.getElementById('size-row').style.display = m === 'stamp' ? 'none' : 'flex';
+  canvas.style.cursor = m === 'stamp' ? 'pointer' : m === 'eraser' ? 'cell' : 'crosshair';
+}
+
+// 画纸面板是一个可开合的抽屉，打开时仍可继续在画布上作画
+function togglePaperPanel() {
+  const panel = document.getElementById('paper-panel');
+  const open = !panel.classList.contains('show');
+  panel.classList.toggle('show', open);
+  if (open) document.getElementById('stamp-panel').classList.remove('show');
+  document.getElementById('btn-paper').classList.toggle('active', open);
+  // 抽屉打开时不影响当前画笔模式
+  if (open) {
+    document.querySelectorAll('.mode-btn').forEach(b => {
+      if (b.dataset.mode !== 'paper') b.classList.toggle('active', b.dataset.mode === lastDrawMode);
+    });
+  }
+}
+
+// ============ 提示 ============
+let toastTimer = null;
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 1200);
+}
+
+// ============ 事件绑定 ============
+function init() {
+  loadPaperChoice();
+  initCanvas();
+  buildColors();
+  buildStamps();
+  buildPapers();
+
+  // 模式按钮
+  document.getElementById('btn-draw').addEventListener('click', () => switchMode('draw'));
+  document.getElementById('btn-stamp').addEventListener('click', () => switchMode('stamp'));
+  document.getElementById('btn-eraser').addEventListener('click', () => switchMode('eraser'));
+  document.getElementById('btn-paper').addEventListener('click', togglePaperPanel);
+
+  // 粗细
+  document.querySelectorAll('.size-btn').forEach(b => {
+    b.addEventListener('click', () => {
+      document.querySelectorAll('.size-btn').forEach(x => x.classList.remove('active'));
+      b.classList.add('active');
+      brushSize = +b.dataset.s;
+    });
+  });
+
+  // 顶栏按钮
+  document.getElementById('btn-undo').addEventListener('click', undo);
+  document.getElementById('btn-clear').addEventListener('click', clearAll);
+  document.getElementById('btn-save').addEventListener('click', saveDrawing);
+  document.getElementById('btn-download').addEventListener('click', downloadDrawing);
+  document.getElementById('btn-snapshots').addEventListener('click', openSnapshotPanel);
+  document.getElementById('snapshot-overlay').addEventListener('click', e => {
+    if (e.target.id === 'snapshot-overlay') closeSnapshotPanel();
+  });
+
+  // 加载上次保存的画作
+  loadDrawing();
+
+  // 自动保存快照（每30秒）
+  autoSaveTimer = setInterval(autoSave, AUTO_SAVE_INTERVAL);
+
+  // 画布交互
+  canvas.addEventListener('mousedown', startDraw);
+  canvas.addEventListener('mousemove', moveDraw);
+  canvas.addEventListener('mouseup', endDraw);
+  canvas.addEventListener('mouseleave', endDraw);
+  canvas.addEventListener('touchstart', startDraw, { passive: false });
+  canvas.addEventListener('touchmove', moveDraw, { passive: false });
+  canvas.addEventListener('touchend', endDraw);
+}
+
+init();
+</script>
+</body>
+</html>
