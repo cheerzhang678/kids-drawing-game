@@ -257,6 +257,8 @@ const COLORS = [
   { hex: '#ffffff', name: '白' },
   { hex: '#bdbdbd', name: '浅灰' },
   { hex: '#3949ab', name: '靛' },
+  { hex: '#e8d3a1', name: '米色' },
+  { hex: 'rainbow',  name: '彩虹' },
 ];
 
 const ANIMALS = ['🐱','🐶','🐰','🐻','🐼','🐨','🦊','🐯','🦁','🐮','🐷','🐸','🐵','🐔','🐧','🦋'];
@@ -322,6 +324,15 @@ const PAPERS = [
 let mode = 'draw';          // draw | stamp | eraser | paper
 let lastDrawMode = 'draw';  // 从画纸面板返回时用
 let currentColor = COLORS[0].hex;
+let rainbowHue = 0;
+// 返回当前描边颜色：彩虹模式下随绘制推进循环色相
+function strokeColor() {
+  if (currentColor === 'rainbow') {
+    rainbowHue = (rainbowHue + 8) % 360;
+    return `hsl(${rainbowHue}, 90%, 55%)`;
+  }
+  return currentColor;
+}
 let brushSize = 14;
 let currentStamp = ANIMALS[0];
 let currentPaper = PAPERS[0];
@@ -933,7 +944,7 @@ function startDraw(e) {
   // 画一个点
   ctx.beginPath();
   ctx.arc(p.x, p.y, (mode === 'eraser' ? brushSize * 1.5 : brushSize) / 2, 0, Math.PI * 2);
-  ctx.fillStyle = mode === 'eraser' ? '#000' : currentColor;
+  ctx.fillStyle = mode === 'eraser' ? '#000' : strokeColor();
   ctx.fill();
   ctx.globalCompositeOperation = 'source-over';
 }
@@ -946,7 +957,7 @@ function moveDraw(e) {
   ctx.beginPath();
   ctx.moveTo(lastX, lastY);
   ctx.lineTo(p.x, p.y);
-  ctx.strokeStyle = mode === 'eraser' ? '#000' : currentColor;
+  ctx.strokeStyle = mode === 'eraser' ? '#000' : strokeColor();
   ctx.lineWidth = mode === 'eraser' ? brushSize * 1.5 : brushSize;
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
@@ -978,7 +989,11 @@ function buildColors() {
   COLORS.forEach((c, i) => {
     const d = document.createElement('div');
     d.className = 'color-dot' + (i === 0 ? ' active' : '');
-    d.style.background = c.hex;
+    if (c.hex === 'rainbow') {
+      d.style.background = 'conic-gradient(#ff0000,#ff9800,#ffeb3b,#4caf50,#00bcd4,#3f51b5,#9c27b0,#ff0000)';
+    } else {
+      d.style.background = c.hex;
+    }
     if (c.hex === '#ffffff') d.style.border = '3px solid #ccc';
     d.addEventListener('click', () => {
       document.querySelectorAll('.color-dot').forEach(x => x.classList.remove('active'));
